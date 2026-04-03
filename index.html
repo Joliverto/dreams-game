@@ -203,8 +203,8 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Escala o canvas pelo devicePixelRatio (limitado a 2 para não sobrecarregar GPU mobile)
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        // Escala o canvas pelo devicePixelRatio para telas de alta resolução
+        const dpr = window.devicePixelRatio || 1;
         canvas.width = 800 * dpr;
         canvas.height = 400 * dpr;
         ctx.scale(dpr, dpr);
@@ -249,8 +249,10 @@
         let score = 0;
         let lives = 3;
         let frames = 0;
-        let gameSpeed = 2;
+        let gameSpeed = 4;
         let lastTime = 0;
+        let obstacleTimer = 0;
+        let leadTimer = 0;
 
         // Arrays de entidades
         let obstacles = [];
@@ -272,7 +274,7 @@
             height: 80,
             dy: 0,
             gravity: 0.15,
-            jumpPower: -7.75,
+            jumpPower: -6.75,
             grounded: false,
             invulnerable: 0, // Timer de invencibilidade ao tomar dano
             
@@ -425,13 +427,17 @@
         // Gerenciador do Jogo
         function handleGameObjects(dt) {
             // Spawn Obstáculos
-            if (frames % 200 === 0 && Math.random() > 0.5) {
-                obstacles.push(new Obstacle());
+            obstacleTimer += dt;
+            if (obstacleTimer >= 200) {
+                obstacleTimer -= 200;
+                if (Math.random() > 0.5) obstacles.push(new Obstacle());
             }
             
             // Spawn Leads
-            if (frames % 160 === 0 && Math.random() > 0.4) {
-                leads.push(new Lead());
+            leadTimer += dt;
+            if (leadTimer >= 160) {
+                leadTimer -= 160;
+                if (Math.random() > 0.4) leads.push(new Lead());
             }
 
             // Atualiza Obstáculos e checa colisão
@@ -481,23 +487,25 @@
         }
 
         // Loop Principal
-        function animate(timestamp = 0) {
+        function animate(timestamp) {
             if (!gameRunning) return;
 
-            // Delta time normalizado para 60fps (1.0 = velocidade normal)
-            const dt = lastTime ? Math.min((timestamp - lastTime) / 16.667, 3) : 1;
+            if (lastTime === 0) lastTime = timestamp;
+            const rawDt = timestamp - lastTime;
             lastTime = timestamp;
+            // Normaliza para 60fps; limita a 3x para evitar saltos após troca de aba
+            const dt = Math.min(rawDt / (1000 / 60), 3);
             
             ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
             
-            // Velocidade aumenta progressivamente: 2 no início, 5 após 60 segundos (~3600 frames)
-            gameSpeed = 2 + Math.min(frames / 3600, 1) * 3;
+            // Velocidade aumenta progressivamente: 4 no início, 7 após 60 segundos (~3600 frames)
+            gameSpeed = 4 + Math.min(frames / 3600, 1) * 3;
 
             drawBackground(dt);
             handleGameObjects(dt);
             player.update(dt);
             
-            frames++;
+            frames += dt;
             requestAnimationFrame(animate);
         }
 
@@ -518,7 +526,6 @@
         }
 
         function resetVariables() {
-            lastTime = 0;
             player.y = groundY - player.height;
             player.dy = 0;
             player.invulnerable = 0;
@@ -527,9 +534,12 @@
             score = 0;
             lives = 3;
             frames = 0;
-            gameSpeed = 2;
+            gameSpeed = 4;
             bgX = 0;
             groundX = 0;
+            lastTime = 0;
+            obstacleTimer = 0;
+            leadTimer = 0;
             document.getElementById('scoreDisplay').innerText = score;
             updateHearts();
         }
