@@ -249,7 +249,7 @@
         let score = 0;
         let lives = 3;
         let frames = 0;
-        let gameSpeed = 2;
+        let gameSpeed = 5;
 
         // Delta time — garante velocidade consistente independente do FPS
         let lastTime = 0;
@@ -276,8 +276,8 @@
             width: 65,
             height: 80,
             dy: 0,
-            gravity: 0.15,
-            jumpPower: -7.75,
+            gravity: 0.25,
+            jumpPower: -8.75,
             grounded: false,
             invulnerable: 0, // Timer de invencibilidade ao tomar dano
             
@@ -500,9 +500,9 @@
 
             ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-            // Velocidade aumenta progressivamente: 2 no início, 5 após 60 segundos (~3600 unidades de tempo)
+            // Velocidade aumenta progressivamente: 4 no início, 7 após 60 segundos (~3600 unidades de tempo)
             gameTime += delta;
-            gameSpeed = 2 + Math.min(gameTime / 3600, 1) * 3;
+            gameSpeed = 6 + Math.min(gameTime / 3600, 1) * 3;
 
             drawBackground(delta);
             handleGameObjects(delta);
@@ -537,7 +537,7 @@
             score = 0;
             lives = 3;
             frames = 0;
-            gameSpeed = 2;
+            gameSpeed = 6;
             bgX = 0;
             groundX = 0;
             document.getElementById('scoreDisplay').innerText = score;
