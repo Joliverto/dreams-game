@@ -203,8 +203,8 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Escala o canvas pelo devicePixelRatio para telas de alta resolução
-        const dpr = window.devicePixelRatio || 1;
+        // Escala o canvas pelo devicePixelRatio (limitado a 2 para não sobrecarregar GPU mobile)
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = 800 * dpr;
         canvas.height = 400 * dpr;
         ctx.scale(dpr, dpr);
@@ -250,6 +250,7 @@
         let lives = 3;
         let frames = 0;
         let gameSpeed = 2;
+        let lastTime = 0;
 
         // Arrays de entidades
         let obstacles = [];
@@ -288,11 +289,11 @@
                 }
             },
             
-            update() {
+            update(dt) {
                 // Gravidade
-                this.y += this.dy;
+                this.y += this.dy * dt;
                 if (this.y + this.height < groundY) {
-                    this.dy += this.gravity;
+                    this.dy += this.gravity * dt;
                     this.grounded = false;
                 } else {
                     this.dy = 0;
@@ -300,7 +301,7 @@
                     this.grounded = true;
                 }
 
-                if (this.invulnerable > 0) this.invulnerable--;
+                if (this.invulnerable > 0) this.invulnerable -= dt;
                 
                 this.draw();
             },
@@ -321,8 +322,8 @@
                 this.y = groundY - this.height;
                 this.markedForDeletion = false;
             }
-            update() {
-                this.x -= gameSpeed;
+            update(dt) {
+                this.x -= gameSpeed * dt;
                 if (this.x + this.width < 0) this.markedForDeletion = true;
                 this.draw();
             }
@@ -351,11 +352,11 @@
                 this.markedForDeletion = false;
                 this.angle = 0;
             }
-            update() {
-                this.x -= gameSpeed;
+            update(dt) {
+                this.x -= gameSpeed * dt;
                 // Efeito de flutuação (seno)
-                this.y += Math.sin(this.angle) * 1.5;
-                this.angle += 0.1;
+                this.y += Math.sin(this.angle) * 1.5 * dt;
+                this.angle += 0.1 * dt;
 
                 if (this.x + this.width < 0) this.markedForDeletion = true;
                 this.draw();
@@ -383,20 +384,20 @@
         // Cenário (Fundo animado)
         let bgX = 0;
         let groundX = 0;
-        function drawBackground() {
+        function drawBackground(dt) {
             ctx.fillStyle = '#72D6EE'; // Cor da água do parque
             ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
             if (images.bg.complete && images.bg.naturalWidth > 0) {
                 // Efeito Parallax simples
-                bgX -= gameSpeed * 0.5;
+                bgX -= gameSpeed * 0.5 * dt;
                 if (bgX <= -GAME_WIDTH) bgX = 0;
                 ctx.drawImage(images.bg, bgX, 0, GAME_WIDTH, GAME_HEIGHT);
                 ctx.drawImage(images.bg, bgX + GAME_WIDTH, 0, GAME_WIDTH, GAME_HEIGHT);
             }
 
             // Desenha o chão com movimento (mesma velocidade dos obstáculos)
-            groundX -= gameSpeed;
+            groundX -= gameSpeed * dt;
             if (groundX <= -GAME_WIDTH) groundX = 0;
             if (images.ground.complete && images.ground.naturalWidth > 0) {
                 const srcY = Math.floor(images.ground.naturalHeight * 0.83);
@@ -422,7 +423,7 @@
         }
 
         // Gerenciador do Jogo
-        function handleGameObjects() {
+        function handleGameObjects(dt) {
             // Spawn Obstáculos
             if (frames % 200 === 0 && Math.random() > 0.5) {
                 obstacles.push(new Obstacle());
@@ -435,7 +436,7 @@
 
             // Atualiza Obstáculos e checa colisão
             obstacles.forEach((obs, index) => {
-                obs.update();
+                obs.update(dt);
                 
                 // Colisão com obstáculo
                 if (checkCollision(player, obs)) {
@@ -453,7 +454,7 @@
 
             // Atualiza Leads e checa captura
             leads.forEach((lead, index) => {
-                lead.update();
+                lead.update(dt);
                 
                 // Pegou o Lead!
                 if (checkCollision(player, lead)) {
@@ -480,17 +481,21 @@
         }
 
         // Loop Principal
-        function animate() {
+        function animate(timestamp = 0) {
             if (!gameRunning) return;
+
+            // Delta time normalizado para 60fps (1.0 = velocidade normal)
+            const dt = lastTime ? Math.min((timestamp - lastTime) / 16.667, 3) : 1;
+            lastTime = timestamp;
             
             ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
             
             // Velocidade aumenta progressivamente: 2 no início, 5 após 60 segundos (~3600 frames)
             gameSpeed = 2 + Math.min(frames / 3600, 1) * 3;
 
-            drawBackground();
-            handleGameObjects();
-            player.update();
+            drawBackground(dt);
+            handleGameObjects(dt);
+            player.update(dt);
             
             frames++;
             requestAnimationFrame(animate);
@@ -513,6 +518,7 @@
         }
 
         function resetVariables() {
+            lastTime = 0;
             player.y = groundY - player.height;
             player.dy = 0;
             player.invulnerable = 0;
