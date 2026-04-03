@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Captura de Leads - Dreams</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --dreams-purple: #6A0DAD;
+            --dreams-cyan: #00E5FF;
+            --dreams-orange: #FF5E3A;
+            --water: #72D6EE;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            font-family: 'Press Start 2P', cursive;
+            touch-action: none;
+            padding:
+                env(safe-area-inset-top, 0px)
+                env(safe-area-inset-right, 0px)
+                env(safe-area-inset-bottom, 0px)
+                env(safe-area-inset-left, 0px);
+        }
+
+        #game-container {
+            position: relative;
+            width: min(
+                100%,
+                800px,
+                calc((100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) * 2)
+            );
+            aspect-ratio: 2 / 1;
+            background-color: var(--water);
+            box-shadow: 0 0 20px var(--dreams-purple);
+            border: 4px solid var(--dreams-cyan);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: auto;
+        }
+
+        /* Interface do Usuário (UI) */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hud-text {
+            color: white;
+            text-shadow: 2px 2px 0 var(--dreams-purple);
+            font-size: clamp(8px, 1.8vw, 14px);
+        }
+
+        #hearts {
+            color: #ff3366;
+            font-size: clamp(12px, 2.5vw, 18px);
+            text-shadow: 2px 2px 0 #880000;
+        }
+
+        /* Telas de Início e Game Over */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(106, 13, 173, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: all;
+            color: white;
+        }
+
+        .overlay h1 {
+            color: var(--dreams-cyan);
+            text-shadow: 3px 3px 0 #000;
+            margin-bottom: 20px;
+            font-size: clamp(14px, 3vw, 24px);
+            line-height: 1.5;
+        }
+
+        .overlay p {
+            font-size: clamp(7px, 1.2vw, 10px);
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+
+        button {
+            background-color: var(--dreams-orange);
+            color: white;
+            font-family: inherit;
+            border: 2px solid white;
+            padding: clamp(10px, 2vw, 15px) clamp(12px, 2.5vw, 20px);
+            font-size: clamp(9px, 1.5vw, 12px);
+            cursor: pointer;
+            box-shadow: 4px 4px 0 #000;
+            transition: transform 0.1s;
+            min-width: 44px;
+            min-height: 44px;
+        }
+
+        button:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0 #000;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Tela de aviso de rotação */
+        #rotate-message {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #111;
+            color: white;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            z-index: 9999;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 11px;
+            line-height: 2;
+            padding: 30px;
+            gap: 15px;
+        }
+
+        #rotate-message .rotate-icon {
+            font-size: 48px;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0%   { transform: rotate(0deg); }
+            25%  { transform: rotate(90deg); }
+            50%  { transform: rotate(90deg); }
+            75%  { transform: rotate(90deg); }
+            100% { transform: rotate(90deg); }
+        }
+
+        @media (orientation: portrait) and (max-width: 1024px) {
+            #rotate-message { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="rotate-message">
+        <span class="rotate-icon">&#x21BB;</span>
+        <p>Gire o celular<br>para modo<br>paisagem</p>
+    </div>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        
+        <div id="ui-layer">
+            <div class="hud-text">LEADS: <span id="scoreDisplay">0</span></div>
+            <div id="hearts">♥♥♥</div>
+        </div>
+
+        <div id="startScreen" class="overlay">
+            <h1>CAPTURA DE<br>LEADS</h1>
+            <p>Páscoa Dreams no Parque Aquático!</p>
+            <p>Toque na tela ou aperte ESPAÇO para pular.</p>
+            <button onclick="startGame()">INICIAR EVENTO</button>
+        </div>
+
+        <div id="gameOverScreen" class="overlay hidden">
+            <h1>FIM DO EXPEDIENTE</h1>
+            <p>Você capturou <span id="finalScore">0</span> Leads!</p>
+            <button onclick="resetGame()">TENTAR NOVAMENTE</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Escala o canvas pelo devicePixelRatio para telas de alta resolução
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = 800 * dpr;
+        canvas.height = 400 * dpr;
+        ctx.scale(dpr, dpr);
+
+        // Carregamento de Assets (Imagens)
+        const images = {};
+        const assets = {
+            player: 'assets/chefe.png',
+            lead: 'assets/lead.png',
+            obstacle: 'assets/obstaculo.png',
+            bg: 'assets/fundo.png',
+            ground: 'assets/chao.png'
+        };
+
+        for (let key in assets) {
+            images[key] = new Image();
+            images[key].src = assets[key];
+        }
+
+        // Efeitos sonoros
+        const sfxLead = new Audio('assets/sound/lead-reclaim.mp3');
+        sfxLead.volume = 0.6;
+
+        // Soundtrack
+        const soundtrack = new Audio('assets/sound/sountrack-game.mp3');
+        soundtrack.loop = true;
+        soundtrack.volume = 0.4;
+
+        // Inicia a música na primeira interação do usuário (política de autoplay dos browsers)
+        let musicStarted = false;
+        function tryStartMusic() {
+            if (!musicStarted) {
+                musicStarted = true;
+                soundtrack.play().catch(() => {});
+            }
+        }
+        document.addEventListener('pointerdown', tryStartMusic, { once: true });
+        document.addEventListener('keydown', tryStartMusic, { once: true });
+
+        // Variáveis Globais do Jogo
+        let gameRunning = false;
+        let score = 0;
+        let lives = 3;
+        let frames = 0;
+        let gameSpeed = 2;
+
+        // Arrays de entidades
+        let obstacles = [];
+        let leads = [];
+
+        // Dimensões lógicas do jogo (independente do DPR)
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 400;
+
+        // Chão do parque aquático
+        const groundHeight = 80;
+        const groundY = GAME_HEIGHT - groundHeight;
+
+        // Personagem (A Chefe)
+        const player = {
+            x: 50,
+            y: 0,
+            width: 65,
+            height: 80,
+            dy: 0,
+            gravity: 0.15,
+            jumpPower: -7.75,
+            grounded: false,
+            invulnerable: 0, // Timer de invencibilidade ao tomar dano
+            
+            draw() {
+                // Efeito de piscar quando toma dano
+                if (this.invulnerable > 0 && frames % 10 < 5) return;
+
+                if (images.player.complete && images.player.naturalWidth > 0) {
+                    ctx.drawImage(images.player, this.x, this.y, this.width, this.height);
+                } else {
+                    // Fallback se a imagem não carregar (Retângulo roxo)
+                    ctx.fillStyle = '#6A0DAD';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            },
+            
+            update() {
+                // Gravidade
+                this.y += this.dy;
+                if (this.y + this.height < groundY) {
+                    this.dy += this.gravity;
+                    this.grounded = false;
+                } else {
+                    this.dy = 0;
+                    this.y = groundY - this.height;
+                    this.grounded = true;
+                }
+
+                if (this.invulnerable > 0) this.invulnerable--;
+                
+                this.draw();
+            },
+            
+            jump() {
+                if (this.grounded) {
+                    this.dy = this.jumpPower;
+                }
+            }
+        };
+
+        // Classe para Obstáculos
+        class Obstacle {
+            constructor() {
+                this.width = 60 + Math.random() * 20;
+                this.height = 100 + Math.random() * 40;
+                this.x = GAME_WIDTH;
+                this.y = groundY - this.height;
+                this.markedForDeletion = false;
+            }
+            update() {
+                this.x -= gameSpeed;
+                if (this.x + this.width < 0) this.markedForDeletion = true;
+                this.draw();
+            }
+            draw() {
+                ctx.save();
+                ctx.shadowBlur = 18;
+                ctx.shadowColor = '#ff0044';
+                if (images.obstacle.complete && images.obstacle.naturalWidth > 0) {
+                    ctx.drawImage(images.obstacle, this.x, this.y, this.width, this.height);
+                } else {
+                    ctx.fillStyle = '#ff0044';
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+                ctx.restore();
+            }
+        }
+
+        // Classe para os LEADS (Colecionáveis)
+        class Lead {
+            constructor() {
+                this.width = 30;
+                this.height = 30;
+                this.x = GAME_WIDTH + 50;
+                // Flutua em alturas diferentes
+                this.y = groundY - 80 - Math.random() * 100;
+                this.markedForDeletion = false;
+                this.angle = 0;
+            }
+            update() {
+                this.x -= gameSpeed;
+                // Efeito de flutuação (seno)
+                this.y += Math.sin(this.angle) * 1.5;
+                this.angle += 0.1;
+
+                if (this.x + this.width < 0) this.markedForDeletion = true;
+                this.draw();
+            }
+            draw() {
+                // Efeito de brilho
+                ctx.save();
+                ctx.globalAlpha = 0.7 + Math.abs(Math.sin(frames * 0.1)) * 0.3;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#FF5E3A';
+
+                if (images.lead.complete && images.lead.naturalWidth > 0) {
+                    ctx.drawImage(images.lead, this.x, this.y, this.width, this.height);
+                } else {
+                    // Fallback Lead (Círculo Laranja/Amarelo)
+                    ctx.fillStyle = '#FF5E3A';
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        // Cenário (Fundo animado)
+        let bgX = 0;
+        let groundX = 0;
+        function drawBackground() {
+            ctx.fillStyle = '#72D6EE'; // Cor da água do parque
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+            if (images.bg.complete && images.bg.naturalWidth > 0) {
+                // Efeito Parallax simples
+                bgX -= gameSpeed * 0.5;
+                if (bgX <= -GAME_WIDTH) bgX = 0;
+                ctx.drawImage(images.bg, bgX, 0, GAME_WIDTH, GAME_HEIGHT);
+                ctx.drawImage(images.bg, bgX + GAME_WIDTH, 0, GAME_WIDTH, GAME_HEIGHT);
+            }
+
+            // Desenha o chão com movimento (mesma velocidade dos obstáculos)
+            groundX -= gameSpeed;
+            if (groundX <= -GAME_WIDTH) groundX = 0;
+            if (images.ground.complete && images.ground.naturalWidth > 0) {
+                const srcY = Math.floor(images.ground.naturalHeight * 0.83);
+                const srcH = images.ground.naturalHeight - srcY;
+                ctx.drawImage(images.ground, 0, srcY, images.ground.naturalWidth, srcH, groundX, groundY, GAME_WIDTH, groundHeight);
+                ctx.drawImage(images.ground, 0, srcY, images.ground.naturalWidth, srcH, groundX + GAME_WIDTH, groundY, GAME_WIDTH, groundHeight);
+            } else {
+                ctx.fillStyle = '#00E5FF';
+                ctx.fillRect(0, groundY, GAME_WIDTH, groundHeight);
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, groundY, GAME_WIDTH, 5);
+            }
+        }
+
+        // Detector de Colisão
+        function checkCollision(rect1, rect2) {
+            return (
+                rect1.x < rect2.x + rect2.width &&
+                rect1.x + rect1.width > rect2.x &&
+                rect1.y < rect2.y + rect2.height &&
+                rect1.y + rect1.height > rect2.y
+            );
+        }
+
+        // Gerenciador do Jogo
+        function handleGameObjects() {
+            // Spawn Obstáculos
+            if (frames % 200 === 0 && Math.random() > 0.5) {
+                obstacles.push(new Obstacle());
+            }
+            
+            // Spawn Leads
+            if (frames % 160 === 0 && Math.random() > 0.4) {
+                leads.push(new Lead());
+            }
+
+            // Atualiza Obstáculos e checa colisão
+            obstacles.forEach((obs, index) => {
+                obs.update();
+                
+                // Colisão com obstáculo
+                if (checkCollision(player, obs)) {
+                    if (player.invulnerable <= 0) {
+                        lives--;
+                        updateHearts();
+                        player.invulnerable = 60; // 1 segundo de invencibilidade (60 frames)
+                        
+                        if (lives <= 0) {
+                            endGame();
+                        }
+                    }
+                }
+            });
+
+            // Atualiza Leads e checa captura
+            leads.forEach((lead, index) => {
+                lead.update();
+                
+                // Pegou o Lead!
+                if (checkCollision(player, lead)) {
+                    score++;
+                    document.getElementById('scoreDisplay').innerText = score;
+                    lead.markedForDeletion = true;
+                    sfxLead.currentTime = 0;
+                    sfxLead.play().catch(() => {});
+                    
+
+                }
+            });
+
+            // Remove objetos que saíram da tela ou foram pegos
+            obstacles = obstacles.filter(obs => !obs.markedForDeletion);
+            leads = leads.filter(lead => !lead.markedForDeletion);
+        }
+
+        function updateHearts() {
+            let heartsStr = '';
+            for(let i=0; i<lives; i++) heartsStr += '♥';
+            for(let i=lives; i<3; i++) heartsStr += '♡';
+            document.getElementById('hearts').innerText = heartsStr;
+        }
+
+        // Loop Principal
+        function animate() {
+            if (!gameRunning) return;
+            
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            
+            // Velocidade aumenta progressivamente: 2 no início, 5 após 60 segundos (~3600 frames)
+            gameSpeed = 2 + Math.min(frames / 3600, 1) * 3;
+
+            drawBackground();
+            handleGameObjects();
+            player.update();
+            
+            frames++;
+            requestAnimationFrame(animate);
+        }
+
+        // Controles do Jogo
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            resetVariables();
+            gameRunning = true;
+            if (!musicStarted) {
+                musicStarted = true;
+            }
+            if (soundtrack.paused) {
+                soundtrack.currentTime = 0;
+                soundtrack.play().catch(() => {});
+            }
+            animate();
+        }
+
+        function resetVariables() {
+            player.y = groundY - player.height;
+            player.dy = 0;
+            player.invulnerable = 0;
+            obstacles = [];
+            leads = [];
+            score = 0;
+            lives = 3;
+            frames = 0;
+            gameSpeed = 2;
+            bgX = 0;
+            groundX = 0;
+            document.getElementById('scoreDisplay').innerText = score;
+            updateHearts();
+        }
+
+        function endGame() {
+            gameRunning = false;
+            soundtrack.pause();
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('finalScore').innerText = score;
+        }
+
+        function resetGame() {
+            startGame();
+        }
+
+        // Eventos de Pulo (Touch para celular, Espaço/Seta pra cima para PC)
+        window.addEventListener('keydown', (e) => {
+            if ((e.code === 'Space' || e.code === 'ArrowUp') && gameRunning) {
+                player.jump();
+            }
+        });
+
+        window.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (gameRunning) {
+                player.jump();
+            }
+        }, { passive: false });
+
+        // Desenha a tela inicial (Mesmo antes de dar play)
+        drawBackground();
+        player.draw();
+
+    </script>
+</body>
+</html>
