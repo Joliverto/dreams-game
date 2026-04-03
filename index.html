@@ -547,6 +547,8 @@
         });
 
         window.addEventListener('touchstart', (e) => {
+            // Permite que toques em botões gerem o evento click normalmente
+            if (e.target.closest('button')) return;
             e.preventDefault();
             if (gameRunning) {
                 player.jump();
