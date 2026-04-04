@@ -360,8 +360,6 @@
             }
             draw() {
                 ctx.save();
-                ctx.shadowBlur = 18;
-                ctx.shadowColor = '#ff0044';
                 if (images.obstacle.complete && images.obstacle.naturalWidth > 0) {
                     ctx.drawImage(images.obstacle, this.x, this.y, this.width, this.height);
                 } else {
