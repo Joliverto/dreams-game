@@ -297,12 +297,6 @@
                     ctx.fillStyle = '#6A0DAD';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
-                // DEBUG: hitbox do personagem
-                ctx.save();
-                ctx.strokeStyle = 'rgba(0, 255, 0, 0.9)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
-                ctx.restore();
             },
             
             update(delta) {
@@ -374,11 +368,6 @@
                     ctx.fillStyle = '#ff0044';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
-                // DEBUG: hitbox do obstáculo
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = 'rgba(255, 0, 0, 0.9)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x + this.hitOffsetX, this.y + this.hitOffsetY, this.hitWidth, this.hitHeight);
                 ctx.restore();
             }
         }
@@ -419,12 +408,6 @@
                     ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
                     ctx.fill();
                 }
-                // DEBUG: hitbox do lead
-                ctx.shadowBlur = 0;
-                ctx.globalAlpha = 1;
-                ctx.strokeStyle = 'rgba(0, 200, 255, 0.9)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
                 ctx.restore();
             }
         }
@@ -478,11 +461,6 @@
                     ctx.closePath();
                     ctx.fill();
                 }
-                // DEBUG: hitbox do obstáculo aéreo
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = 'rgba(255, 150, 0, 0.9)';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x + this.hitOffsetX, this.y + this.hitOffsetY, this.hitWidth, this.hitHeight);
                 ctx.restore();
             }
         }
