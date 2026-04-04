@@ -215,6 +215,7 @@
             player: 'assets/chefe.png',
             lead: 'assets/lead.png',
             obstacle: 'assets/obstaculo.png',
+            aerial: 'assets/obstaculo-aereo.png',
             bg: 'assets/fundo.png',
             ground: 'assets/chao.png'
         };
@@ -256,10 +257,12 @@
         let gameTime = 0;
         let obstacleSpawnTimer = 0;
         let leadSpawnTimer = 0;
+        let aerialSpawnTimer = 0;
 
         // Arrays de entidades
         let obstacles = [];
         let leads = [];
+        let aerialObstacles = [];
 
         // Dimensões lógicas do jogo (independente do DPR)
         const GAME_WIDTH = 800;
@@ -276,9 +279,11 @@
             width: 65,
             height: 80,
             dy: 0,
-            gravity: 0.25,
-            jumpPower: -8.75,
+            gravityNormal: 0.25,   // gravidade normal (descida / soltar pulo)
+            gravityHold: 0.22,     // gravidade reduzida ao segurar (pulo mais alto)
+            jumpPower: -9.25,
             grounded: false,
+            holdingJump: false,    // true enquanto a tecla/touch estiver pressionada
             invulnerable: 0, // Timer de invencibilidade ao tomar dano
             
             draw() {
@@ -292,18 +297,26 @@
                     ctx.fillStyle = '#6A0DAD';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
+                // DEBUG: hitbox do personagem
+                ctx.save();
+                ctx.strokeStyle = 'rgba(0, 255, 0, 0.9)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                ctx.restore();
             },
             
             update(delta) {
-                // Gravidade
+                // Gravidade variável: reduzida ao segurar pulo subindo (pulo alto), normal caso contrário (pulo curto)
+                const gravity = (this.holdingJump && this.dy < 0) ? this.gravityHold : this.gravityNormal;
                 this.y += this.dy * delta;
                 if (this.y + this.height < groundY) {
-                    this.dy += this.gravity * delta;
+                    this.dy += gravity * delta;
                     this.grounded = false;
                 } else {
                     this.dy = 0;
                     this.y = groundY - this.height;
                     this.grounded = true;
+                    this.holdingJump = false;
                 }
 
                 if (this.invulnerable > 0) this.invulnerable -= delta;
@@ -314,7 +327,14 @@
             jump() {
                 if (this.grounded) {
                     this.dy = this.jumpPower;
+                    this.holdingJump = true;
                 }
+            },
+
+            // Chamado ao soltar a tecla/touch: corta o pulo se ainda estiver subindo
+            releaseJump() {
+                this.holdingJump = false;
+                if (this.dy < -7.5) this.dy = -7.5;
             }
         };
 
@@ -326,6 +346,18 @@
                 this.x = GAME_WIDTH;
                 this.y = groundY - this.height;
                 this.markedForDeletion = false;
+
+                // ── Hitbox independente ──────────────────────────────────────
+                // Altere só estes dois valores; a imagem não muda.
+                // Reduzir hitWidth encolhe igualmente nos dois lados (esquerdo e direito).
+                // Reduzir hitHeight encolhe igualmente em cima e em baixo.
+                this.hitWidth  = this.width  - 40; // largura da hitbox
+                this.hitHeight = this.height - 10; // altura da hitbox
+                // ─────────────────────────────────────────────────────────────
+
+                // Offsets calculados automaticamente para centralizar a hitbox na imagem
+                this.hitOffsetX = (this.width  - this.hitWidth)  / 2;
+                this.hitOffsetY = (this.height - this.hitHeight) / 2;
             }
             update(delta) {
                 this.x -= gameSpeed * delta;
@@ -342,6 +374,11 @@
                     ctx.fillStyle = '#ff0044';
                     ctx.fillRect(this.x, this.y, this.width, this.height);
                 }
+                // DEBUG: hitbox do obstáculo
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.9)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x + this.hitOffsetX, this.y + this.hitOffsetY, this.hitWidth, this.hitHeight);
                 ctx.restore();
             }
         }
@@ -382,6 +419,70 @@
                     ctx.arc(this.x + this.width/2, this.y + this.height/2, this.width/2, 0, Math.PI * 2);
                     ctx.fill();
                 }
+                // DEBUG: hitbox do lead
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = 'rgba(0, 200, 255, 0.9)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                ctx.restore();
+            }
+        }
+
+        // Classe para Obstáculos Aéreos
+        class AerialObstacle {
+            constructor() {
+                // Tamanho visual do sprite
+                this.width  = 50;
+                this.height = 50;
+                // Surge do lado direito, fora da tela
+                this.x = GAME_WIDTH + 50;
+                // Voa acima das árvores — terço superior da tela
+                this.baseY = 30 + Math.random() * 100;
+                this.y = this.baseY;
+                this.angle = Math.random() * Math.PI * 2; // fase aleatória do seno
+                this.markedForDeletion = false;
+
+                // Hitbox mesmo tamanho do lead (30x30), centralizada no sprite
+                this.hitWidth  = 30;
+                this.hitHeight = 30;
+                this.hitOffsetX = (this.width  - this.hitWidth)  / 2;
+                this.hitOffsetY = (this.height - this.hitHeight) / 2;
+            }
+            update(delta) {
+                // Move da direita para a esquerda mais rápido que o scroll do cenário (sentido oposto ao personagem)
+                this.x -= gameSpeed * 1.5 * delta;
+                // Movimento vertical suave em ondas (efeito de voo)
+                this.angle += 0.07 * delta;
+                this.y = this.baseY + Math.sin(this.angle) * 18;
+
+                if (this.x + this.width < 0) this.markedForDeletion = true;
+                this.draw();
+            }
+            draw() {
+                ctx.save();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff6600';
+                if (images.aerial.complete && images.aerial.naturalWidth > 0) {
+                    ctx.drawImage(images.aerial, this.x, this.y, this.width, this.height);
+                } else {
+                    // Fallback: losango laranja
+                    const cx = this.x + this.width / 2;
+                    const cy = this.y + this.height / 2;
+                    ctx.fillStyle = '#ff6600';
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy - this.height / 2);
+                    ctx.lineTo(cx + this.width / 2, cy);
+                    ctx.lineTo(cx, cy + this.height / 2);
+                    ctx.lineTo(cx - this.width / 2, cy);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                // DEBUG: hitbox do obstáculo aéreo
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = 'rgba(255, 150, 0, 0.9)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x + this.hitOffsetX, this.y + this.hitOffsetY, this.hitWidth, this.hitHeight);
                 ctx.restore();
             }
         }
@@ -431,8 +532,8 @@
         function handleGameObjects(delta) {
             // Spawn Obstáculos (baseado em tempo, não em frames)
             obstacleSpawnTimer += delta;
-            if (obstacleSpawnTimer >= 200) {
-                if (Math.random() > 0.5) obstacles.push(new Obstacle());
+            if (obstacleSpawnTimer >= 150) {
+                if (Math.random() > 0.3) obstacles.push(new Obstacle());
                 obstacleSpawnTimer = 0;
             }
 
@@ -443,12 +544,22 @@
                 leadSpawnTimer = 0;
             }
 
+            // Spawn Obstáculos Aéreos — só aparecem após 12 segundos de jogo
+            if (gameTime >= 720) {
+                aerialSpawnTimer += delta;
+                if (aerialSpawnTimer >= 220) {
+                    if (Math.random() > 0.45) aerialObstacles.push(new AerialObstacle());
+                    aerialSpawnTimer = 0;
+                }
+            }
+
             // Atualiza Obstáculos e checa colisão
             obstacles.forEach((obs, index) => {
                 obs.update(delta);
                 
-                // Colisão com obstáculo
-                if (checkCollision(player, obs)) {
+                // Colisão com obstáculo (usa hitbox independente)
+                const obsHit = { x: obs.x + obs.hitOffsetX, y: obs.y + obs.hitOffsetY, width: obs.hitWidth, height: obs.hitHeight };
+                if (checkCollision(player, obsHit)) {
                     if (player.invulnerable <= 0) {
                         lives--;
                         updateHearts();
@@ -477,9 +588,25 @@
                 }
             });
 
+            // Atualiza Obstáculos Aéreos e checa colisão
+            aerialObstacles.forEach(aer => {
+                aer.update(delta);
+
+                const aerHit = { x: aer.x + aer.hitOffsetX, y: aer.y + aer.hitOffsetY, width: aer.hitWidth, height: aer.hitHeight };
+                if (checkCollision(player, aerHit)) {
+                    if (player.invulnerable <= 0) {
+                        lives--;
+                        updateHearts();
+                        player.invulnerable = 60;
+                        if (lives <= 0) endGame();
+                    }
+                }
+            });
+
             // Remove objetos que saíram da tela ou foram pegos
             obstacles = obstacles.filter(obs => !obs.markedForDeletion);
             leads = leads.filter(lead => !lead.markedForDeletion);
+            aerialObstacles = aerialObstacles.filter(aer => !aer.markedForDeletion);
         }
 
         function updateHearts() {
@@ -531,9 +658,11 @@
         function resetVariables() {
             player.y = groundY - player.height;
             player.dy = 0;
+            player.holdingJump = false;
             player.invulnerable = 0;
             obstacles = [];
             leads = [];
+            aerialObstacles = [];
             score = 0;
             lives = 3;
             frames = 0;
@@ -546,6 +675,7 @@
             lastTime = 0;
             obstacleSpawnTimer = 0;
             leadSpawnTimer = 0;
+            aerialSpawnTimer = 0;
         }
 
         function endGame() {
@@ -561,8 +691,14 @@
 
         // Eventos de Pulo (Touch para celular, Espaço/Seta pra cima para PC)
         window.addEventListener('keydown', (e) => {
-            if ((e.code === 'Space' || e.code === 'ArrowUp') && gameRunning) {
+            if ((e.code === 'Space' || e.code === 'ArrowUp') && gameRunning && !e.repeat) {
                 player.jump();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                player.releaseJump();
             }
         });
 
@@ -573,6 +709,12 @@
             if (gameRunning) {
                 player.jump();
             }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            if (e.target.closest('button')) return;
+            e.preventDefault();
+            player.releaseJump();
         }, { passive: false });
 
         // Desenha a tela inicial (Mesmo antes de dar play)
